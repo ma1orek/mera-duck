@@ -73,7 +73,16 @@
 </div>
 
 <div class="card">
-  <h2>3. Chód, który się obraca</h2>
+  <h2>3. Oprogramowanie kaczki</h2>
+  <div id="ver" class="kv"></div>
+  <button id="btUpdCheck" disabled>Sprawdź, czy jest nowsze</button>
+  <button id="btUpdApply" class="main" disabled>Zaktualizuj oprogramowanie kaczki</button>
+  <small>Najpierw podłącz kaczkę do WiFi z internetem (punkt 2). Trwa kilka minut, kaczka na koniec restartuje usługi
+  i Bluetooth się rozłączy: to normalne. Potem połącz się ponownie. Bez tego kaczka nie zna poleceń z punktów 4 i 5.</small>
+</div>
+
+<div class="card">
+  <h2>4. Chód, który się obraca</h2>
   <button id="btCheck" disabled>Sprawdź wersję chodu</button>
   <button id="btUpdate" class="main" disabled>Wgraj najnowszy oficjalny chód (v8+)</button>
   <small>Kaczka pobiera go z internetu, więc musi być najpierw podłączona do WiFi z internetem.</small>
@@ -81,7 +90,7 @@
 </div>
 
 <div class="card">
-  <h2>4. Wstań i ruchy</h2>
+  <h2>5. Wstań i ruchy</h2>
   <div class="row">
     <button id="btInit" disabled>Wstań</button>
     <button id="btEnable" disabled>Włącz chód</button>
@@ -126,7 +135,7 @@ function kv(el, obj) {
 function setConnected(on, text) {
   $('st').classList.toggle('on', on);
   $('stText').textContent = text;
-  for (const id of ['btScan', 'btWifi', 'btCheck', 'btUpdate', 'btInit', 'btEnable', 'btSkills', 'btAddSpin'])
+  for (const id of ['btScan', 'btWifi', 'btUpdCheck', 'btUpdApply', 'btCheck', 'btUpdate', 'btInit', 'btEnable', 'btSkills', 'btAddSpin'])
     $(id).disabled = !on;
   $('btConnect').classList.toggle('hidden', on);
   $('btDisconnect').classList.toggle('hidden', !on);
@@ -216,6 +225,11 @@ async function connect() {
 }
 async function refreshInfo() {
   try {
+    const h = await call('hello', { api_version: 47 });
+    kv($('ver'), { wersja: h.release || h.version || h.daemon, API: h.api_version });
+    log('Oprogramowanie: ' + JSON.stringify(h).slice(0, 300));
+  } catch (e) { log('hello: ' + e.message); }
+  try {
     const i = await call('system.info');
     kv($('info'), { nazwa: i.name, serial: i.serial, 'działa od': i.uptime_seconds != null ? Math.round(i.uptime_seconds / 60) + ' min' : null });
   } catch (e) { log('info: ' + e.message); }
@@ -242,7 +256,12 @@ async function refreshNet() {
 function action(id, fn) {
   $(id).addEventListener('click', async () => {
     const b = $(id); const old = b.textContent; b.disabled = true; b.textContent = 'Czekaj…';
-    try { await fn(); } catch (e) { log('BŁĄD: ' + e.message); alert(e.message); }
+    try { await fn(); } catch (e) {
+      let m = e.message;
+      if (/unknown method|not available over Bluetooth/i.test(m))
+        m += '\n\nKaczka ma stare oprogramowanie. Zrób najpierw punkt 3: „Zaktualizuj oprogramowanie kaczki” (kaczka musi być w WiFi z internetem).';
+      log('BŁĄD: ' + e.message); alert(m);
+    }
     finally { b.textContent = old; b.disabled = id !== 'btConnect' && !ch; }
   });
 }
@@ -274,6 +293,25 @@ action('btWifi', async () => {
   await new Promise((ok) => setTimeout(ok, 3000));
   const n = await refreshNet();
   if (n && n.ip4) log('Kaczka ma adres ' + n.ip4);
+});
+
+action('btUpdCheck', async () => {
+  const r = await call('update.check', { component: 'daemon' }, { idle: 60000 });
+  log('Aktualizacja: ' + JSON.stringify(r).slice(0, 500));
+  kv($('ver'), { zainstalowana: r.installed || r.current, najnowsza: r.latest || r.available, dostępna: r.update_available });
+});
+action('btUpdApply', async () => {
+  const n = await call('net.status');
+  if (!n || !n.ip4) throw new Error('Kaczka nie jest w WiFi. Najpierw punkt 2.');
+  log('Aktualizuję oprogramowanie kaczki, to potrwa kilka minut…');
+  try {
+    const r = await call('update.apply', { component: 'daemon', target: 'latest', options: { dry_run: false } }, { idle: 240000 });
+    log('Wynik: ' + JSON.stringify(r));
+    alert(r && r.outcome === 'unchanged' ? 'Kaczka ma już najnowsze oprogramowanie.' : 'Zaktualizowano. Kaczka zaraz się rozłączy. Odczekaj 30 s i połącz ponownie.');
+  } catch (e) {
+    if (/rozłączono/.test(e.message)) { log('Rozłączyło się w trakcie: to zwykle restart po aktualizacji. Odczekaj 30 s i połącz ponownie.'); return; }
+    throw e;
+  }
 });
 
 action('btCheck', async () => {
