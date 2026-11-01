@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0b0f">
+<title>MERA Duck</title>
+<style>
+  :root {
+    --bg: #0b0b0f; --card: #16161d; --line: #2a2a35; --text: #f2f2f5; --muted: #9a9aa8;
+    --accent: #ffd400; --ok: #2fd47a; --bad: #ff5a5a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px 40px; }
+  h1 { font-size: 26px; margin: 4px 0 2px; letter-spacing: -0.5px; }
+  h1 b { color: var(--accent); }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 0 0 12px; }
+  button { appearance: none; border: 0; border-radius: 12px; padding: 14px 16px; font: 600 16px/1 inherit;
+    background: #262632; color: var(--text); width: 100%; margin-top: 8px; }
+  button.main { background: var(--accent); color: #111; }
+  button:disabled { opacity: .4; }
+  .row { display: flex; gap: 8px; } .row > * { flex: 1; }
+  input, select { width: 100%; padding: 13px 12px; border-radius: 12px; border: 1px solid var(--line);
+    background: #0f0f15; color: var(--text); font-size: 16px; margin-top: 8px; }
+  .status { font-size: 15px; } .status .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--bad); margin-right: 8px; } .status.on .dot { background: var(--ok); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; margin-top: 10px; }
+  .kv span:nth-child(odd) { color: var(--muted); }
+  a.big { display: block; text-align: center; background: var(--ok); color: #04170c; text-decoration: none;
+    font-weight: 700; padding: 16px; border-radius: 12px; margin-top: 10px; word-break: break-all; }
+  #log { font: 12px/1.45 ui-monospace, Menlo, monospace; color: var(--muted); white-space: pre-wrap;
+    max-height: 220px; overflow: auto; }
+  .warn { background: #2a1d00; border-color: #5a4300; color: #ffdf80; font-size: 14px; }
+  .hidden { display: none; }
+  .skills button { text-align: left; }
+  small { color: var(--muted); }
+</style>
+</head>
+<body>
+<h1><b>MERA</b> Duck</h1>
+<div class="sub">Nasza apka do kaczki Microduck: WiFi, chód z obrotem, ruchy.</div>
+
+<div id="noBt" class="card warn hidden">
+  Ta przeglądarka nie ma Bluetooth. Na iPhonie zainstaluj darmową przeglądarkę <b>Bluefy</b> z App Store
+  i otwórz w niej ten sam adres.
+</div>
+
+<div class="card">
+  <h2>1. Połącz z kaczką</h2>
+  <div id="st" class="status"><span class="dot"></span><span id="stText">rozłączona</span></div>
+  <input id="pin" inputmode="numeric" maxlength="6" placeholder="PIN kaczki (domyślnie 000000)">
+  <button id="btConnect" class="main">Szukaj kaczki przez Bluetooth</button>
+  <button id="btDisconnect" class="hidden">Rozłącz</button>
+  <div id="info" class="kv"></div>
+</div>
+
+<div class="card" id="wifiCard">
+  <h2>2. WiFi kaczki</h2>
+  <button id="btScan" disabled>Pokaż sieci, które widzi kaczka</button>
+  <select id="ssidList" class="hidden"></select>
+  <input id="ssid" placeholder="Nazwa sieci (SSID)" autocapitalize="off" autocorrect="off">
+  <input id="psk" placeholder="Hasło WiFi" autocapitalize="off" autocorrect="off">
+  <button id="btWifi" class="main" disabled>Podłącz kaczkę do tej sieci</button>
+  <small>Hotspot iPhone'a: włącz „Pozwalaj innym na dostęp” i „Maksymalna kompatybilność”, ekran hotspotu zostaw otwarty.
+  Łączenie trwa do 45 s.</small>
+  <div id="net" class="kv"></div>
+  <div id="consoleBox" class="hidden"></div>
+</div>
+
+<div class="card">
+  <h2>3. Chód, który się obraca</h2>
+  <button id="btCheck" disabled>Sprawdź wersję chodu</button>
+  <button id="btUpdate" class="main" disabled>Wgraj najnowszy oficjalny chód (v8+)</button>
+  <small>Kaczka pobiera go z internetu, więc musi być najpierw podłączona do WiFi z internetem.</small>
+  <div id="pol" class="kv"></div>
+</div>
+
+<div class="card">
+  <h2>4. Wstań i ruchy</h2>
+  <div class="row">
+    <button id="btInit" disabled>Wstań</button>
+    <button id="btEnable" disabled>Włącz chód</button>
+  </div>
+  <button id="btAddSpin" disabled>Dodaj ruchy „kręcenie” (spin-frenzy, bączek)</button>
+  <button id="btSkills" disabled>Pokaż ruchy kaczki</button>
+  <div id="skills" class="skills"></div>
+  <small>Pierwszy raz postaw kaczkę na stojaku. Chodzenie i obrót gałką: w konsoli kaczki (zielony przycisk w punkcie 2),
+  bo przez Bluetooth kaczka nie przyjmuje sterowania na żywo.</small>
+</div>
+
+<div class="card">
+  <h2>Dziennik</h2>
+  <div id="log"></div>
+</div>
+
+<script>
+const SVC = '6f5d2a10-3b47-4c8e-9a1f-2d7e8c4b6019';
+const RPC = '6f5d2a11-3b47-4c8e-9a1f-2d7e8c4b6019';
+const CHUNK = 20;
+const $ = (id) => document.getElementById(id);
+const enc = new TextEncoder(), dec = new TextDecoder();
+
+let device = null, ch = null, nextId = 1, buf = '';
+const pending = new Map();
+let writeChain = Promise.resolve();
+
+function log(t) {
+  const el = $('log');
+  el.textContent += new Date().toLocaleTimeString() + '  ' + t + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+function kv(el, obj) {
+  el.innerHTML = '';
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined || v === null || v === '') continue;
+    const a = document.createElement('span'); a.textContent = k;
+    const b = document.createElement('span'); b.textContent = typeof v === 'object' ? JSON.stringify(v) : String(v);
+    el.append(a, b);
+  }
+}
+function setConnected(on, text) {
+  $('st').classList.toggle('on', on);
+  $('stText').textContent = text;
+  for (const id of ['btScan', 'btWifi', 'btCheck', 'btUpdate', 'btInit', 'btEnable', 'btSkills', 'btAddSpin'])
+    $(id).disabled = !on;
+  $('btConnect').classList.toggle('hidden', on);
+  $('btDisconnect').classList.toggle('hidden', !on);
+}
+
+// ── transport: NDJSON JSON-RPC, 20-bajtowe kawałki zapisu, powiadomienia składane do '\n' ──
+function onNotify(e) {
+  buf += dec.decode(e.target.value.buffer.slice(e.target.value.byteOffset, e.target.value.byteOffset + e.target.value.byteLength), { stream: true });
+  let at;
+  while ((at = buf.indexOf('\n')) >= 0) {
+    const line = buf.slice(0, at).replace(/\r$/, '');
+    buf = buf.slice(at + 1);
+    if (line) onLine(line);
+  }
+}
+function onLine(line) {
+  let msg;
+  try { msg = JSON.parse(line); } catch { log('? ' + line.slice(0, 200)); return; }
+  if (msg.id !== undefined && msg.id !== null && pending.has(msg.id)) {
+    const p = pending.get(msg.id);
+    if (msg.error) { p.done(); p.reject(new Error(msg.error.message || JSON.stringify(msg.error))); }
+    else if (msg.result && p.progressOnly && p.progressOnly(msg.result)) { p.bump(); p.onProgress && p.onProgress(msg.result); }
+    else { p.done(); p.resolve(msg.result); }
+    return;
+  }
+  // powiadomienie bez id, np. postęp pobierania
+  if (msg.method) {
+    for (const p of pending.values()) p.bump();
+    const pr = msg.params || {};
+    log('· ' + msg.method + ' ' + [pr.component, pr.phase, pr.percent != null ? pr.percent + '%' : '', pr.detail].filter(Boolean).join(' '));
+  }
+}
+async function writeLine(text) {
+  const bytes = enc.encode(text + '\n');
+  writeChain = writeChain.then(async () => {
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      const part = bytes.slice(i, i + CHUNK);
+      if (ch.writeValueWithResponse) await ch.writeValueWithResponse(part);
+      else await ch.writeValue(part);
+    }
+  });
+  return writeChain;
+}
+function call(method, params = {}, { idle = 15000, progressOnly, onProgress } = {}) {
+  if (!ch) return Promise.reject(new Error('brak połączenia'));
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    let timer;
+    const arm = () => { clearTimeout(timer); timer = setTimeout(() => { pending.delete(id); reject(new Error(method + ': brak odpowiedzi')); }, idle); };
+    pending.set(id, { resolve, reject, progressOnly, onProgress, bump: arm, done: () => { clearTimeout(timer); pending.delete(id); } });
+    arm();
+    writeLine(JSON.stringify({ jsonrpc: '2.0', id, method, params })).catch((e) => { clearTimeout(timer); pending.delete(id); reject(e); });
+  });
+}
+
+// ── połączenie ──
+async function connect() {
+  const pin = ($('pin').value || '000000').trim();
+  try { localStorage.setItem('duckPin', pin); } catch {}
+  log('Szukam kaczki…');
+  device = await navigator.bluetooth.requestDevice({
+    filters: [{ services: [SVC] }, { namePrefix: 'duck' }, { namePrefix: 'radxa' }],
+    optionalServices: [SVC],
+  });
+  device.addEventListener('gattserverdisconnected', () => {
+    ch = null; buf = '';
+    for (const p of pending.values()) { p.done(); p.reject(new Error('rozłączono')); }
+    setConnected(false, 'rozłączona'); log('Rozłączono.');
+  });
+  setConnected(false, 'łączę z ' + (device.name || 'kaczką') + '…');
+  const server = await device.gatt.connect();
+  const svc = await server.getPrimaryService(SVC);
+  ch = await svc.getCharacteristic(RPC);
+  // odczyt wersji API wymusza szyfrowane łącze (parowanie); iPhone może zapytać o zgodę
+  try { const v = await ch.readValue(); log('Kaczka mówi API v' + v.getUint8(0) + ' (apka pisana pod v47)'); }
+  catch (e) { log('Odczyt wersji: ' + e.message); }
+  ch.addEventListener('characteristicvaluechanged', onNotify);
+  await ch.startNotifications();
+  const auth = await call('system.authenticate', { pin });
+  if (!auth || auth.authenticated !== true) {
+    const left = auth && auth.attempts_remaining;
+    throw new Error('Zły PIN' + (left != null ? ' (zostało prób: ' + left + ')' : ''));
+  }
+  setConnected(true, 'połączona: ' + (device.name || 'kaczka'));
+  log('Zalogowano PIN-em.');
+  await refreshInfo();
+}
+async function refreshInfo() {
+  try {
+    const i = await call('system.info');
+    kv($('info'), { nazwa: i.name, serial: i.serial, 'działa od': i.uptime_seconds != null ? Math.round(i.uptime_seconds / 60) + ' min' : null });
+  } catch (e) { log('info: ' + e.message); }
+  await refreshNet();
+}
+async function refreshNet() {
+  try {
+    const n = await call('net.status');
+    kv($('net'), { stan: n.state, sieć: n.ssid, sygnał: n.signal != null ? n.signal + '%' : null, adres: n.ip4 });
+    const box = $('consoleBox');
+    if (n.ip4) {
+      const ip = String(n.ip4).split('/')[0];
+      const url = 'http://' + ip + ':8080/';
+      box.innerHTML = '';
+      const a = document.createElement('a'); a.className = 'big'; a.href = url; a.target = '_blank'; a.textContent = 'Otwórz konsolę kaczki: ' + url;
+      const s = document.createElement('small'); s.textContent = 'Tam: connect → enable. Pasek „turn” obraca, pole „forward · strafe” chodzi. Nie klikaj relax ani shutdown. Telefon musi być w tej samej sieci co kaczka (przy hotspocie jest).';
+      box.append(a, s); box.classList.remove('hidden');
+    } else box.classList.add('hidden');
+    return n;
+  } catch (e) { log('net.status: ' + e.message); }
+}
+
+// ── przyciski ──
+function action(id, fn) {
+  $(id).addEventListener('click', async () => {
+    const b = $(id); const old = b.textContent; b.disabled = true; b.textContent = 'Czekaj…';
+    try { await fn(); } catch (e) { log('BŁĄD: ' + e.message); alert(e.message); }
+    finally { b.textContent = old; b.disabled = id !== 'btConnect' && !ch; }
+  });
+}
+action('btConnect', connect);
+$('btDisconnect').addEventListener('click', () => { if (device && device.gatt.connected) device.gatt.disconnect(); });
+
+action('btScan', async () => {
+  const r = await call('net.scan', {}, { idle: 30000 });
+  const list = Array.isArray(r) ? r : (r.networks || r.aps || r.results || []);
+  const sel = $('ssidList'); sel.innerHTML = '';
+  const seen = new Set();
+  for (const n of list) {
+    const s = typeof n === 'string' ? n : n.ssid; if (!s || seen.has(s)) continue; seen.add(s);
+    const o = document.createElement('option'); o.value = s;
+    o.textContent = s + (n.signal != null ? '  (' + n.signal + '%)' : ''); sel.append(o);
+  }
+  sel.classList.toggle('hidden', !seen.size);
+  log('Kaczka widzi sieci: ' + (seen.size ? [...seen].join(', ') : 'żadnej'));
+});
+$('ssidList').addEventListener('change', (e) => { $('ssid').value = e.target.value; });
+
+action('btWifi', async () => {
+  const ssid = $('ssid').value.trim(); const psk = $('psk').value;
+  if (!ssid) throw new Error('Wpisz nazwę sieci');
+  log('Podłączam kaczkę do ' + ssid + ' (do 45 s)…');
+  const params = { ssid }; if (psk) params.psk = psk;
+  const r = await call('net.connect', params, { idle: 75000 });
+  log('WiFi: ' + JSON.stringify(r));
+  await new Promise((ok) => setTimeout(ok, 3000));
+  const n = await refreshNet();
+  if (n && n.ip4) log('Kaczka ma adres ' + n.ip4);
+});
+
+action('btCheck', async () => {
+  const c = await call('policy.check', {}, { idle: 30000 });
+  kv($('pol'), c);
+  log('Chód: ' + JSON.stringify(c));
+  try { const p = await call('robot.policies'); log('Sloty: ' + JSON.stringify(p).slice(0, 600)); } catch (e) { log('robot.policies: ' + e.message); }
+});
+action('btUpdate', async () => {
+  log('Wgrywam najnowszy oficjalny zestaw chodu…');
+  const r = await call('policy.install', {}, {
+    idle: 180000,
+    progressOnly: (res) => res && res.phase && !res.outcome && !res.installed && !res.version,
+    onProgress: (res) => log('· ' + res.phase + (res.percent != null ? ' ' + res.percent + '%' : '')),
+  });
+  kv($('pol'), r || {});
+  log('Gotowe: ' + JSON.stringify(r));
+});
+
+action('btInit', async () => { await call('robot.init', {}, { idle: 30000 }); log('Kaczka wstaje.'); });
+action('btEnable', async () => { const r = await call('robot.enable', { on: true }, { idle: 30000 }); log('Chód włączony: ' + JSON.stringify(r)); });
+
+const SPINS = [
+  { name: 'spin-frenzy', repo: 'microduckapp/microduck-spin-frenzy', duration: 11 },
+  { name: 'spinning-top', repo: 'microduckapp/microduck-spinning-top', duration: 10.5 },
+];
+action('btAddSpin', async () => {
+  for (const s of SPINS) {
+    log('Pobieram ' + s.repo + '…');
+    const f = await call('policy.fetch', { repo: s.repo }, { idle: 180000 });
+    log('Pobrane: ' + f.path);
+    await call('robot.setSkill', { name: s.name, path: f.path, duration: s.duration }, { idle: 75000 });
+    log('Dodany ruch: ' + s.name);
+  }
+  await showSkills();
+});
+
+async function showSkills() {
+  const r = await call('robot.skills');
+  const names = [...(r.skills || []).map((s) => s.name), ...(r.built_in || [])];
+  const box = $('skills'); box.innerHTML = '';
+  for (const n of names) {
+    const b = document.createElement('button'); b.textContent = '▶ ' + n;
+    b.addEventListener('click', async () => {
+      try { await call('robot.do', { skill: n }, { idle: 30000 }); log('Ruch: ' + n); }
+      catch (e) { log('BŁĄD ' + n + ': ' + e.message); alert(e.message + '\n\nNajpierw „Wstań” i „Włącz chód”.'); }
+    });
+    box.append(b);
+  }
+  log('Ruchy: ' + (names.join(', ') || 'brak'));
+}
+action('btSkills', showSkills);
+
+// ── start ──
+try { $('pin').value = localStorage.getItem('duckPin') || ''; } catch {}
+if (!navigator.bluetooth) { $('noBt').classList.remove('hidden'); $('btConnect').disabled = true; }
+setConnected(false, 'rozłączona');
+if (!navigator.bluetooth) $('btConnect').disabled = true;
+</script>
+</body>
+</html>
